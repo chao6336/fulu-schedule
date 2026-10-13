@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>福祿圓滿｜服務人員活動排班系統</title><link rel="stylesheet" href="style.css"><style>
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.account-area {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.user-email {
+  font-size: 13px;
+  color: #52635c;
+  white-space: nowrap;
+}
+
+.logout-btn {
+  border: 1px solid #d8dfda;
+  background: #fff;
+  color: #315f50;
+  border-radius: 8px;
+  padding: 7px 12px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.logout-btn:hover {
+  background: #f3f7f4;
+}
+</style></head><body class="mu-locked">
+<header>
+  <div class="brand">
+    <span class="logo">福</span>
+    <div>
+      <b>福祿圓滿</b>
+      <small>服務人員活動排班系統</small>
+    </div>
+  </div>
+
+  <div class="header-right">
+    <div class="event">
+      <span class="dot"></span>
+      <span id="eventLabel">福祿圓滿・多人共用</span>
+    </div>
+
+    <div class="account-area">
+      <span id="userEmail" class="user-email"></span>
+    </div>
+
+    <button class="icon" id="settingsBtn" title="活動設定">⚙</button>
+  </div>
+</header>
+<div class="layout"><aside><div class="nav-label">活動管理</div><nav id="nav"><button class="active" data-page="dashboard">▦　總覽</button><button data-page="shifts">▤　全部排班表</button><button data-page="tasks">☷　工作項目</button><button data-page="people">♙　服務人員</button><button data-page="personal">▧　個人班表</button><button data-page="leaders">♧　負責人工作表</button><button data-page="users">⚿　使用者管理</button></nav><div class="side-note"><b>雲端共用資料</b><p>資料存在雲端，所有人看到的是同一份，幾秒內自動更新。</p><button id="backupBtn" class="subtle">匯出完整資料</button><button id="restoreBtn" class="subtle">還原完整資料備份</button><button id="resetDataBtn" class="btn danger" style="width:100%;margin-top:10px;font-size:11px;padding:7px 8px">清除全部測試資料</button></div></aside><main><div class="pagehead"><div><div class="eyebrow" id="eyebrow">活動概況</div><h1 id="title">總覽</h1><p id="subtitle">掌握活動人力與排班進度</p></div><div id="headActions"></div></div><section id="content"></section></main></div>
+<dialog id="modal"><form method="dialog" id="form"><div class="modal-head"><div><div class="eyebrow" id="modalEyebrow">資料</div><h2 id="modalTitle">新增</h2></div><button type="button" class="icon" data-action="close-modal" aria-label="關閉">✕</button></div><div id="formBody"></div><div class="form-actions"><button type="button" class="btn light" data-action="close-modal">取消</button><button type="submit" class="btn primary" id="saveBtn" value="default">儲存</button></div></form></dialog><dialog id="conflictConfirm" class="conflict-confirm"><h2 id="conflictConfirmTitle">⚠️ 時段衝突提醒</h2><div id="conflictConfirmBody"></div><div class="form-actions"><button type="button" class="btn light" id="conflictCancelBtn">取消</button><button type="button" class="btn primary" id="conflictProceedBtn">仍然安排</button></div></dialog><dialog id="deleteTaskConfirm" class="delete-task-confirm"><h2>確定要刪除這個工作項目嗎？</h2><div id="deleteTaskDetails" class="delete-task-details"></div><div class="form-actions"><button type="button" class="btn light" id="deleteTaskCancelBtn">取消</button><button type="button" class="btn light task-delete-confirm-button" id="deleteTaskProceedBtn">確定刪除</button></div></dialog><dialog id="personActionConfirm" class="person-action-confirm"><h2 id="personActionTitle"></h2><p id="personActionMessage"></p><div class="form-actions"><button type="button" class="btn light" id="personActionCancelBtn">取消</button><button type="button" class="btn danger" id="personActionProceedBtn">確定刪除</button></div></dialog><input id="fileInput" type="file" accept=".csv,.txt" hidden><input id="backupRestoreInput" type="file" accept=".json,application/json" hidden><input id="workImportInput" type="file" accept=".csv,.txt,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv" hidden><div id="toast" role="status"></div><script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="config.js"></script><script src="cloud-backend.js"></script><script src="app.js"></script><script src="export.js"></script><script src="multiuser.js"></script></body></html>
