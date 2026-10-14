@@ -163,7 +163,7 @@
   function softRefresh() {
     const values = {};
     content.querySelectorAll('input[id],select[id]').forEach(control => { values[control.id] = control.value; });
-    $('#eventLabel').textContent = `${db.event.name || '福祿圓滿'}・多人共用`;
+    $('#eventLabel').textContent = `${db.event.name || '晁人'}・多人共用`;
     render(values.leaderSelect || '', values.leaderDate || '');
     for (const [id, value] of Object.entries(values)) {
       const control = document.getElementById(id);
@@ -293,7 +293,7 @@
     await loadState();
     document.body.classList.remove('mu-locked');
     setOnline(true);
-    $('#eventLabel').textContent = `${db.event.name || '福祿圓滿'}・多人共用`;
+    $('#eventLabel').textContent = `${db.event.name || '晁人'}・多人共用`;
     if (page === 'users' && user.role !== 'admin') nav('dashboard'); else render();
     if (!pollTimer) pollTimer = setInterval(tick, CLOUD ? 5000 : 3000);
     offerLegacyImport();
@@ -431,7 +431,7 @@
   // ---------- 畫面元件 ----------
   document.body.insertAdjacentHTML('beforeend', `
     <div id="muAuth"><form id="muAuthForm" class="mu-auth-card">
-      <div class="brand"><span class="logo">福</span><div><b>福祿圓滿</b><small>服務人員活動排班系統・多人版</small></div></div>
+      <div class="brand"><span class="logo">晁</span><div><b>晁人</b><small>服務人員活動排班系統・多人版</small></div></div>
       <h2 id="muAuthTitle">連線中…</h2><p id="muAuthNote"></p>
       <div id="muAuthFields" class="mu-form-grid"></div>
       <div id="muAuthError" class="mu-error" role="alert"></div>

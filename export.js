@@ -322,7 +322,7 @@ async function downloadSelectedReport() {
   const range = exportRangeValues();
   if ((selectedExportReport === 'conflicts' || selectedExportReport === 'unassigned') && !exportRangeIsValid(range)) return;
   const workbook = new ExcelJS.Workbook();
-  workbook.creator = '福祿圓滿菁英排班系統';
+  workbook.creator = '晁人菁英排班系統';
   workbook.created = new Date();
   if (selectedExportReport === 'tasks') exportWorkItems(workbook);
   if (selectedExportReport === 'personal') exportPersonalSchedules(workbook, selection);
