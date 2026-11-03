@@ -34,15 +34,15 @@
     bad_email: '請輸入正確的 Email',
     email_not_confirmed: '這個 Email 還沒確認，請先到信箱點確認連結',
     confirm_email: '註冊成功！請到信箱點確認連結，再回來登入',
-    reset_sent: '已寄出重設密碼的信，請到信箱點連結',
+    reset_sent: '如果這個 Email 已註冊，重設密碼信會寄到信箱；請也檢查垃圾郵件。',
     not_configured: '雲端連線資料還沒填好（config.js）'
   };
-  const EDIT_ACTIONS = new Set(['new-task', 'edit-task', 'new-person', 'edit-person', 'import', 'import-work', 'confirm-work-import', 'resync-leaders']);
+  const EDIT_ACTIONS = new Set(['new-task', 'edit-task', 'new-person', 'edit-person', 'import', 'import-work', 'confirm-work-import', 'resync-leaders', 'new', 'edit', 'new-task']);
   const DELETE_ACTIONS = new Set(['delete-task', 'delete-person']);
   const LEGACY_KEY = 'fuluyuanman_scheduler_v1';
 
   const MU = window.MU = { me: null, version: 0, forceReplace: false };
-  let snapshot = { event: { rev: 0, json: '' }, people: new Map(), tasks: new Map() };
+  let snapshot = { event: { rev: 0, json: '' }, categories: { rev: 0, json: '' }, people: new Map(), tasks: new Map(), projects: new Map() };
   let chain = Promise.resolve();
   let busy = 0, polling = false, stale = false, pollTimer = null, editingUser = null;
 
@@ -73,13 +73,18 @@
     db = {
       event: state.event && typeof state.event === 'object' ? state.event : seed().event,
       people: Array.isArray(state.people) ? state.people : [],
-      tasks: Array.isArray(state.tasks) ? state.tasks : []
+      tasks: Array.isArray(state.tasks) ? state.tasks : [],
+      projects: Array.isArray(state.projects) ? state.projects : [],
+      projectCategories: Array.isArray(state.projectCategories) ? state.projectCategories : ['活動','行銷','課程','培訓','行政','長期計畫','其他'],
+      projectUsers: Array.isArray(state.projectUsers) ? state.projectUsers : []
     };
     normalizePeopleReferences(db);
     snapshot = {
       event: { rev: state.eventRev || 0, json: JSON.stringify(db.event) },
+      categories: { rev: state.projectCategoriesRev || 0, json: JSON.stringify(db.projectCategories) },
       people: new Map(db.people.map((record, index) => [record.id, { rev: state.peopleRevs[index], json: JSON.stringify(record) }])),
-      tasks: new Map(db.tasks.map((record, index) => [record.id, { rev: state.tasksRevs[index], json: JSON.stringify(record) }]))
+      tasks: new Map(db.tasks.map((record, index) => [record.id, { rev: state.tasksRevs[index], json: JSON.stringify(record) }])),
+      projects: new Map(db.projects.map((record, index) => [record.id, { rev: state.projectRevs[index], json: JSON.stringify(record) }]))
     };
     MU.version = state.version;
     stale = false;
@@ -94,11 +99,13 @@
       return [{
         op: 'replaceAll', id: '', rev: 0, record: JSON.stringify(db.event),
         people: db.people.map(record => JSON.stringify(record)),
-        tasks: db.tasks.map(record => JSON.stringify(record))
+        tasks: db.tasks.map(record => JSON.stringify(record)),
+        projects: db.projects.map(record => JSON.stringify(record)),
+        projectCategories: db.projectCategories
       }];
     }
     const ops = [];
-    for (const [kind, list, known] of [['Person', db.people, snapshot.people], ['Task', db.tasks, snapshot.tasks]]) {
+    for (const [kind, list, known] of [['Person', db.people, snapshot.people], ['Task', db.tasks, snapshot.tasks], ['Project', db.projects, snapshot.projects]]) {
       const present = new Set();
       for (const record of list) {
         const id = String(record.id), text = JSON.stringify(record), before = known.get(record.id);
@@ -112,13 +119,16 @@
     }
     const eventText = JSON.stringify(db.event);
     if (eventText !== snapshot.event.json) ops.push({ op: 'setEvent', id: '', rev: snapshot.event.rev, record: eventText });
+    const categoriesText = JSON.stringify(db.projectCategories);
+    if (categoriesText !== snapshot.categories.json) ops.push({ op: 'setProjectCategories', id: '', rev: snapshot.categories.rev, record: categoriesText });
     return ops;
   }
 
   function rememberSent(ops) {
     for (const op of ops) {
-      const known = op.op.endsWith('Person') ? snapshot.people : snapshot.tasks;
+      const known = op.op.endsWith('Person') ? snapshot.people : op.op.endsWith('Project') ? snapshot.projects : snapshot.tasks;
       if (op.op === 'setEvent') snapshot.event = { rev: op.rev + 1, json: op.record };
+      else if (op.op === 'setProjectCategories') snapshot.categories = { rev: op.rev + 1, json: op.record };
       else if (op.op.startsWith('put')) known.set(op.id, { rev: op.rev + 1, json: op.record });
       else if (op.op.startsWith('del')) known.delete(op.id);
     }
@@ -262,7 +272,7 @@
       setup: { title: '第一次使用：建立管理者', note: '第一個註冊的人會成為管理者，之後由你開通其他人的權限。', fields: [email, ['name', '顯示姓名', 'text', 'name'], newPassword, again], submit: '建立管理者', endpoint: '/api/setup' },
       login: { title: '登入排班系統', note: '請輸入你註冊的 Email 與密碼。', fields: [email, ['password', '密碼', 'password', 'current-password']], submit: '登入', links: [['register', '註冊新帳號'], ['forgot', '忘記密碼']] },
       register: { title: '註冊新帳號', note: '註冊後需要管理者開通權限，才能進入排班系統。', fields: [email, ['name', '顯示姓名', 'text', 'name'], newPassword, again], submit: '註冊', endpoint: '/api/register', links: [['login', '已有帳號，回到登入']] },
-      forgot: { title: '忘記密碼', note: '輸入註冊的 Email，系統會寄一封重設密碼的信給你。', fields: [email], submit: '寄出重設信', endpoint: '/api/forgot', links: [['login', '回到登入']] },
+      forgot: { title: '忘記密碼', note: '輸入 Email。若帳號已註冊，系統會寄出重設密碼信；請也檢查垃圾郵件。', fields: [email], submit: '寄出重設信', endpoint: '/api/forgot', links: [['login', '回到登入']] },
       recovery: { title: '設定新密碼', note: '請輸入新的密碼。', fields: [newPassword, again], submit: '儲存新密碼', endpoint: '/api/recover' },
       pending: { title: '等待管理者開通', note: '你的帳號已註冊，請通知管理者到「使用者管理」幫你設定權限，再回來按重新整理。', fields: [], submit: '重新整理', links: [['logout', '改用其他帳號登入']] },
       offline: { title: '連不上雲端', note: '請確認這台裝置的網路正常，再按重新整理。', fields: [], submit: '重新整理' },

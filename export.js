@@ -21,7 +21,7 @@ function exportTime(value) {
 }
 
 function exportTaskTime(task) {
-  return `${exportTime(task.start)}–${exportTime(task.end)}`;
+  return task.allDay ? '整天' : time(task);
 }
 
 function exportWeekday(dateValue) {
@@ -37,8 +37,8 @@ function exportText(value) {
 
 function exportSort(tasks) {
   return [...tasks].sort((a, b) =>
-    String(a.date || '').localeCompare(String(b.date || '')) ||
-    exportTimeMinutes(a.start) - exportTimeMinutes(b.start) ||
+    taskStartKey(a).localeCompare(taskStartKey(b)) ||
+    taskEndKey(a).localeCompare(taskEndKey(b)) ||
     String(a.name || '').localeCompare(String(b.name || ''), 'zh-Hant')
   );
 }
@@ -107,19 +107,27 @@ function appendExportRows(sheet, rows, descriptionColumnIndex) {
 function taskExportValues(task) {
   const assignedIds = [...new Set(task.assigned || [])];
   const need = Number(task.need || 0);
+  const project = (db.projects || []).find(item => String(item.id) === String(task.projectId || ''));
+  const owner = (db.projectUsers || []).find(item => String(item.id) === String(task.ownerUserId || ''));
   return [
-    exportText(task.date), exportTaskTime(task), exportText(task.name), exportText(task.description),
+    exportText(taskStartDate(task)), task.allDay ? '' : exportTime(taskStartTime(task)),
+    exportText(taskEndDate(task)), task.allDay ? '' : exportTime(taskEndTime(task)), task.allDay ? '是' : '否',
+    exportText(task.name), exportText(task.description),
+    exportText(project?.name || '未歸屬專案'), exportText(owner?.name || ''),
+    Number.isFinite(Number(task.progress)) ? Number(task.progress) : task.status === '已完成' ? 100 : 0,
+    ({ low: '低', normal: '一般', high: '高', urgent: '緊急' })[task.priority] || '一般',
+    task.isMilestone ? '是' : '否', task.requiresScheduling === false ? '否' : '是',
     exportText(task.place), need, assignedIds.length, Math.max(0, need - assignedIds.length),
     taskLeaderLabel(task), assignedIds.map(id => personLabel(id)).join('、'), task.status || '規劃中'
   ];
 }
 
 function exportWorkItems(workbook) {
-  const headers = ['日期', '時間', '工作名稱', '工作說明', '地點', '需求人數', '已安排人數', '缺額', '主要負責人', '已安排服務人員', '狀態'];
-  const widths = [14, 24, 26, 55, 22, 12, 14, 10, 24, 38, 14];
-  const sheet = configureExportWorksheet(workbook, '工作項目', headers, widths, 3);
+  const headers = ['開始日期', '開始時間', '結束日期', '結束時間', '整天', '工作名稱', '工作說明', '專案', '任務負責人', '進度', '優先序', '里程碑', '需要排班', '地點', '需求人數', '已安排人數', '缺額', '主要負責人', '已安排服務人員', '狀態'];
+  const widths = [14, 14, 14, 14, 10, 26, 55, 24, 20, 10, 10, 10, 12, 22, 12, 14, 10, 24, 38, 14];
+  const sheet = configureExportWorksheet(workbook, '工作項目', headers, widths, 6);
   const rows = exportSort(db.tasks).map(taskExportValues);
-  appendExportRows(sheet, rows, 3);
+  appendExportRows(sheet, rows, 6);
 }
 
 function uniqueSheetName(value, used) {
@@ -146,7 +154,7 @@ function personalRows(personRecord) {
     (task.assigned || []).some(id => String(id) === String(personRecord.id))
   ));
   return assignedTasks.map(task => [
-    exportText(task.date), exportWeekday(task.date), exportTaskTime(task), exportText(task.name),
+    taskShortDateLabel(task), exportWeekday(taskStartDate(task)), exportTaskTime(task), exportText(task.name),
     exportText(task.description), exportText(task.place), taskLeaderLabel(task),
     personalAssignedPeople(task), task.status || '規劃中'
   ]);
@@ -186,12 +194,11 @@ function exportLeaderSheets(workbook, selection) {
   const sheet = configureExportWorksheet(workbook, '負責人工作表', headers, widths, 5);
   const tasks = exportSort(db.tasks.filter(task => selection === 'all' || leaderKey(task) === selection))
     .sort((a, b) => taskLeaderLabel(a).localeCompare(taskLeaderLabel(b), 'zh-Hant') ||
-      String(a.date || '').localeCompare(String(b.date || '')) ||
-      exportTimeMinutes(a.start) - exportTimeMinutes(b.start) ||
+      taskStartKey(a).localeCompare(taskStartKey(b)) ||
       String(a.name || '').localeCompare(String(b.name || ''), 'zh-Hant'));
   const rows = tasks.map(task => {
-    const [date, time, name, description, place, need, assignedCount, gap, , people, status] = taskExportValues(task);
-    return [taskLeaderLabel(task), date, exportWeekday(task.date), time, name, description, place, need, assignedCount, gap, people, status];
+    const values = taskExportValues(task);
+    return [taskLeaderLabel(task), taskShortDateLabel(task), exportWeekday(taskStartDate(task)), exportTaskTime(task), values[5], values[6], values[13], values[14], values[15], values[16], values[18], values[19]];
   });
   appendExportRows(sheet, rows, 5);
 }
@@ -220,14 +227,9 @@ function exportRangeIsValid(range) {
 }
 
 function taskMatchesExportRange(task, range) {
-  if (range.dateFrom && String(task.date || '') < range.dateFrom) return false;
-  if (range.dateTo && String(task.date || '') > range.dateTo) return false;
-  if (!range.timeFrom && !range.timeTo) return true;
-  const taskStart = exportTimeSeconds(task.start);
-  const taskEnd = exportTimeSeconds(task.end);
-  const rangeStart = range.timeFrom ? exportTimeSeconds(range.timeFrom) : 0;
-  const rangeEnd = range.timeTo ? exportTimeSeconds(range.timeTo) : 86400;
-  return taskStart < rangeEnd && rangeStart < taskEnd;
+  if (range.dateFrom && taskEndDate(task) < range.dateFrom) return false;
+  if (range.dateTo && taskStartDate(task) > range.dateTo) return false;
+  return taskMatchesTime(task, range.timeFrom, range.timeTo);
 }
 
 function exportOverlappingAssignments(workbook, range) {
@@ -241,23 +243,16 @@ function exportOverlappingAssignments(workbook, range) {
     const firstPeople = new Set((first.assigned || []).map(String));
     for (let secondIndex = firstIndex + 1; secondIndex < tasks.length; secondIndex++) {
       const second = tasks[secondIndex];
-      if (!first.id || first.id === second.id || first.date !== second.date || !taskMatchesExportRange(first, range)) continue;
-      const overlapStart = Math.max(exportTimeSeconds(first.start), exportTimeSeconds(second.start));
-      const overlapEnd = Math.min(exportTimeSeconds(first.end), exportTimeSeconds(second.end));
-      if (!(overlapStart < overlapEnd)) continue;
-      const rangeStart = range.timeFrom ? exportTimeSeconds(range.timeFrom) : 0;
-      const rangeEnd = range.timeTo ? exportTimeSeconds(range.timeTo) : 86400;
-      if ((range.timeFrom || range.timeTo) && !(overlapStart < rangeEnd && rangeStart < overlapEnd)) continue;
+      if (!first.id || first.id === second.id || !overlaps(first, second) || !taskMatchesExportRange(first, range)) continue;
       const sharedPeople = [...new Set((second.assigned || []).map(String))]
         .filter(personId => firstPeople.has(personId))
         .sort((a, b) => personLabel(a).localeCompare(personLabel(b), 'zh-Hant'));
-      for (const personId of sharedPeople) {
-        rows.push([
-          personLabel(personId), exportText(first.date), `${exportClockFromSeconds(overlapStart)}–${exportClockFromSeconds(overlapEnd)}`,
-          exportText(first.name), exportTaskTime(first), exportText(first.description),
-          exportText(second.name), exportTaskTime(second), exportText(second.description)
-        ]);
-      }
+      const sharedDates=taskDates(first).filter(d=>taskIncludesDate(second,d)&&(!range.dateFrom||d>=range.dateFrom)&&(!range.dateTo||d<=range.dateTo));
+      for(const overlapDate of sharedDates){const firstWindow=taskWindowOnDate(first,overlapDate),secondWindow=taskWindowOnDate(second,overlapDate),overlapStart=Math.max(firstWindow[0],secondWindow[0]),overlapEnd=Math.min(firstWindow[1],secondWindow[1]),rangeStart=range.timeFrom?exportTimeMinutes(range.timeFrom):0,rangeEnd=range.timeTo?exportTimeMinutes(range.timeTo):1440;if(!(overlapStart<overlapEnd&&overlapStart<rangeEnd&&rangeStart<overlapEnd))continue;for (const personId of sharedPeople) rows.push([
+        personLabel(personId), overlapDate, `${exportClockFromSeconds(overlapStart*60)}–${exportClockFromSeconds(overlapEnd*60)}`,
+        exportText(first.name), exportTaskTime(first), exportText(first.description),
+        exportText(second.name), exportTaskTime(second), exportText(second.description)
+      ])}
     }
   }
   rows.sort((a, b) => a[1].localeCompare(b[1]) || a[2].localeCompare(b[2]) || a[0].localeCompare(b[0], 'zh-Hant'));
