@@ -34,7 +34,7 @@
 
   function backupPayload(){return {schemaVersion:2,event:db.event,people:db.people,tasks:db.tasks,projects:db.projects,projectCategories:db.projectCategories}}
   function projectName(id){return projectById(id)?.name||'未歸屬專案'}
-  exportTasks=function(){const head=['開始日期','開始時間','結束日期','結束時間','整天','工作','專案','任務負責人','進度','優先序','里程碑','需要排班','地點','需求','已排','缺額','主要負責人','已安排人員','狀態'],lines=db.tasks.map(t=>[taskStartDate(t),t.allDay?'':taskStartTime(t),taskEndDate(t),t.allDay?'':taskEndTime(t),t.allDay?'是':'否',t.name,projectName(t.projectId),userName(t.ownerUserId),taskProgress(t),priorityLabel(t.priority),t.isMilestone?'是':'否',t.requiresScheduling===false?'否':'是',t.place,t.need,(t.assigned||[]).length,shortage(t),taskLeaderLabel(t),assigned(t).map(p=>personLabel(p.id)).join('、'),t.status||'規劃中'].map(csvCell).join(','));download('SW-II_完整任務.csv',[head.map(csvCell).join(','),...lines].join('\r\n'))};
+  exportTasks=function(){const head=['開始日期','開始時間','結束日期','結束時間','整天','工作','專案','任務負責人','進度','優先序','里程碑','需要排班','地點','需求','已排','缺額','主要負責人','已安排人員','狀態'],lines=scheduleTasks().map(t=>[taskStartDate(t),t.allDay?'':taskStartTime(t),taskEndDate(t),t.allDay?'':taskEndTime(t),t.allDay?'是':'否',t.name,projectName(t.projectId),userName(t.ownerUserId),taskProgress(t),priorityLabel(t.priority),t.isMilestone?'是':'否','是',t.place,t.need,(t.assigned||[]).length,shortage(t),taskLeaderLabel(t),assigned(t).map(p=>personLabel(p.id)).join('、'),t.status||'規劃中'].map(csvCell).join(','));download('SW-II_排班任務.csv',[head.map(csvCell).join(','),...lines].join('\r\n'))};
 
   const PROJECT_IMPORT_COLUMNS=[
     {key:'project',label:'專案',aliases:['專案','所屬專案','project']},{key:'owner',label:'任務負責人',aliases:['任務負責人','owner']},
